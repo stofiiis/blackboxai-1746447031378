@@ -1,0 +1,157 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Rodičovská Kontrola - Dashboard";
+}
+
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                <h1 class="text-3xl font-bold text-gray-900">Rodičovská Kontrola</h1>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+            <!-- Time Remaining Card -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-clock text-3xl text-blue-500"></i>
+                        </div>
+                        <div class="ml-5 w-0 flex-1">
+                            <dl>
+                                <dt class="text-sm font-medium text-gray-500 truncate">
+                                    Zbývající čas
+                                </dt>
+                                <dd class="flex items-baseline">
+                                    <div class="text-2xl font-semibold text-gray-900" id="timeRemaining">
+                                        Načítání...
+                                    </div>
+                                </dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="bg-white overflow-hidden shadow rounded-lg mb-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Ovládání</h2>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <button onclick="sendCommand('shutdown')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700">
+                            <i class="fas fa-power-off mr-2"></i>
+                            Vypnout PC
+                        </button>
+                        <button onclick="adjustTimeLimit()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+                            <i class="fas fa-clock mr-2"></i>
+                            Upravit limit
+                        </button>
+                        <button onclick="sendCommand('cancelLimit')" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700">
+                            <i class="fas fa-ban mr-2"></i>
+                            Zrušit limit
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Running Applications -->
+            <div class="bg-white overflow-hidden shadow rounded-lg">
+                <div class="px-4 py-5 sm:p-6">
+                    <h2 class="text-lg font-medium text-gray-900 mb-4">Běžící aplikace</h2>
+                    <div class="overflow-hidden bg-white shadow sm:rounded-md">
+                        <ul role="list" class="divide-y divide-gray-200" id="runningApps">
+                            <li class="px-4 py-4 sm:px-6">
+                                Načítání aplikací...
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const apiUrl = 'https://localhost:7001/api'; // Update with your API URL
+        const childId = '1'; // Update with actual child ID management
+
+        async function updateStatus() {
+            try {
+                const response = await fetch(`${apiUrl}/control/status/${childId}`);
+                const data = await response.json();
+                
+                // Update time remaining
+                const minutes = Math.floor(data.timeRemainingInSeconds / 60);
+                const seconds = data.timeRemainingInSeconds % 60;
+                document.getElementById('timeRemaining').textContent = 
+                    `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                // Update running applications
+                const apps = data.activeProcesses.split(',');
+                document.getElementById('runningApps').innerHTML = apps
+                    .map(app => `
+                        <li class="px-4 py-4 sm:px-6">
+                            <div class="flex items-center">
+                                <i class="fas fa-window-maximize text-gray-400 mr-3"></i>
+                                <span class="text-sm text-gray-900">${app.trim()}</span>
+                            </div>
+                        </li>
+                    `)
+                    .join('');
+            } catch (error) {
+                console.error('Error updating status:', error);
+            }
+        }
+
+        async function sendCommand(commandType, parameter = null) {
+            try {
+                const response = await fetch(`${apiUrl}/control/command`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        childId: childId,
+                        commandType: commandType,
+                        parameter: parameter
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to send command');
+                }
+
+                alert('Příkaz byl úspěšně odeslán');
+            } catch (error) {
+                console.error('Error sending command:', error);
+                alert('Chyba při odesílání příkazu');
+            }
+        }
+
+        function adjustTimeLimit() {
+            const minutes = prompt('Zadejte nový časový limit (v minutách):');
+            if (minutes !== null && !isNaN(minutes)) {
+                sendCommand('adjustTime', minutes.toString());
+            }
+        }
+
+        // Update status every 5 seconds
+        updateStatus();
+        setInterval(updateStatus, 5000);
+    </script>
+</body>
+</html>
